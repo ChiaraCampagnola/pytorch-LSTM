@@ -1,3 +1,10 @@
 .python-version
 .vscode/
-*/__pycache__
+__pycache__/
+micro_alice.txt
+mini_alice.txt
+result.txt
+alice_model.pt
+test.py
+alice_model_20epochs.pt
+alice_model_30.pt
