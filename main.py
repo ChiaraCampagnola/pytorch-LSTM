@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from data import TextProcess
+from data import TextProcess, train_test_split
 from model import TextGenerator, train, generate
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -9,12 +9,11 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 corpus = TextProcess()
 
 batch_size = 6
-data, data_indeces = corpus.get_data('alice.txt')
-batch_data = corpus.get_batched_data(data_indeces, batch_size=batch_size)
-
-# print(f'data: {data}')
-# print(f'indeces: {data_indeces}')
-# print(batch_data)
+_, data_indeces = corpus.get_data('mini_alice.txt')
+train_data, test_data = train_test_split(data_indeces)
+train_batch = corpus.get_batched_data(train_data, batch_size=batch_size)
+test_batch = corpus.get_batched_data(test_data, batch_size=batch_size)
+data = (train_batch, test_batch)
 
 # Set parameters
 embed_size = 128
@@ -26,30 +25,19 @@ learning_rate = 0.002
 
 vocab_size = len(corpus.dictionary)
 
-# Don't get this
-num_batches = batch_data.shape[1] // sequence_length
-
 model = TextGenerator(vocab_size, embed_size, hidden_size, num_layers)
 loss_fn = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
-epochs = 20
+#model.load_state_dict(torch.load("alice_model_40.pt", map_location=torch.device(device)))
 
-#print(model.state_dict()['embed.weight'])
+epochs = 2
 
-model.load_state_dict(torch.load("alice_model_20epochs.pt"))
-        
-train(model, batch_data, sequence_length, epochs, loss_fn, optimizer)
+model.to(device)   
+train(model, data, sequence_length, epochs, loss_fn, optimizer)
 
-#print(model.state_dict()['embed.weight'])
 
-torch.save(model.state_dict(), "alice_model_30.pt")
+#torch.save(model.state_dict(), "alice_model_50.pt")
 
-#model2 = TextGenerator(vocab_size, embed_size, hidden_size, num_layers)
-#model2.load_state_dict(torch.load("alice_model.pt"))
-        
-#print(model2.state_dict()['embed.weight'])
-
-generate(model, corpus, "Alice", text_length=200)
-
+generate(model, corpus, "Once", text_length=100)
 

@@ -26,15 +26,19 @@ class TextGenerator(nn.Module):
         out = self.linear(out)
         return out, (h, c)
 
-def train(model, batch_data, seq_length, epochs, loss_function, optimizer):
+def train(model, data, seq_length, epochs, loss_function, optimizer):
+    train_batch, test_batch = data
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print('Training model...')
 
-    batch_size, num_batches = batch_data.shape
+    batch_size, num_batches = train_batch.shape
+    _, num_batches_test = test_batch.shape
     hidden_size = model.lstm.hidden_size
     num_layers = model.lstm.num_layers
     
     for epoch in range(epochs):
+        model.train()
+        
         # Initialise hidden and cell state
         h = torch.zeros(num_layers, batch_size, hidden_size)
         c = torch.zeros(num_layers, batch_size, hidden_size)
@@ -46,8 +50,8 @@ def train(model, batch_data, seq_length, epochs, loss_function, optimizer):
         num_steps = math.ceil((num_batches-seq_length)/seq_length)
         current_step = 1
         for i in range(0, num_batches-seq_length, seq_length):
-            src = batch_data[:, i:i+seq_length]
-            trg = batch_data[:, (i+1):(i+1)+seq_length]
+            src = train_batch[:, i:i+seq_length]
+            trg = train_batch[:, (i+1):(i+1)+seq_length]
             
             src = src.to(device)
             trg = trg.to(device)
@@ -62,9 +66,31 @@ def train(model, batch_data, seq_length, epochs, loss_function, optimizer):
             epoch_loss += loss.item()
             print(f'Running epoch [{epoch+1}/{epochs}],'
                   f'Step: [{current_step}/{num_steps}],'
-                  f'Loss: {epoch_loss:.4f}               ', end="\r", flush=True)
+                  f'Loss: {epoch_loss/num_batches:.2f}               ', end="\r", flush=True)
             current_step += 1
-        print(f'Epoch [{epoch+1}/{epochs}], Loss: {epoch_loss:.4f}                                ')
+            
+        # Evaluate on test
+        model.eval()
+        # Initialise hidden and cell state
+        h = torch.zeros(num_layers, batch_size, hidden_size)
+        c = torch.zeros(num_layers, batch_size, hidden_size)
+        h = h.to(device)
+        c = c.to(device)
+        
+        total_loss = 0.0
+        for i in range(0, num_batches_test-seq_length, seq_length):
+            src = test_batch[:, i:i+seq_length]
+            trg = test_batch[:, (i+1):(i+1)+seq_length]
+            
+            src = src.to(device)
+            trg = trg.to(device)
+            
+            out, _ = model(src, (h,c))          
+            loss = loss_function(out, trg.reshape(-1))
+            total_loss += loss.item()
+            
+        
+        print(f'Epoch [{epoch+1}/{epochs}], Train loss: {epoch_loss/num_batches:.2f}, Validation loss: {total_loss/num_batches_test:.2f}                                ')
     print("Finished training\n")
         
 def generate(model, corpus, first_word, text_length, path='result.txt'):
@@ -78,10 +104,7 @@ def generate(model, corpus, first_word, text_length, path='result.txt'):
         with open(path, 'w') as file:
             file.write(first_word+' ')
             
-            # Set initial hidden states
-            # states = (torch.zeros(num_layers, 1, hidden_size),
-            #         torch.zeros(num_layers, 1, hidden_size))
-            
+            # Set initial hidden states            
             h = torch.zeros(num_layers, 1, hidden_size)
             c = torch.zeros(num_layers, 1, hidden_size)
             h = h.to(device)
@@ -94,15 +117,23 @@ def generate(model, corpus, first_word, text_length, path='result.txt'):
 
             for i in range(text_length):
                 output, _ = model(input, (h,c))
+                
                 # Sample from output
-                next_word = torch.multinomial(output.exp(), num_samples=1).item()
+                # Get top 20 words:
+                output = output.exp()
+                top_probs, top_indeces = torch.topk(output, 20)
+                top_probs = top_probs.squeeze()
+                top_indeces = top_indeces.squeeze()
+                
+                #next_word = torch.multinomial(output.exp(), num_samples=1).item()
+                next_word = torch.multinomial(top_probs, num_samples=1).item()
+                next_word = top_indeces[next_word].item()
                 input.fill_(next_word)
                 
+                # Add sampled word to file
                 word = corpus.dictionary.idx2word[next_word]
-                if word == '<EOL>':
-                    word = "\n"
-                else:
-                    word = word + ' '
+                if word not in ["'", ",", "!", "\n", ".", ";", "?", ":", '"']:
+                    word = ' ' + word
                 file.write(word)
             
                 if (i+1)%100 == 0:

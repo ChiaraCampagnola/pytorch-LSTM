@@ -1,4 +1,7 @@
 import torch
+from spacy.tokenizer import Tokenizer
+from spacy.lang.en import English
+nlp = English()
 
 class Dictionary(object):
     def __init__(self):
@@ -24,7 +27,9 @@ class TextProcess(object):
         data = []
         with open(path, 'r') as file:
             for line in file:
-                words = line.split() + ['<EOL>'] # Separate words and add end of line token
+                #words = line.split() + ['<EOL>'] # Separate words and add end of line token
+                tokens = nlp(line)
+                words = [tok.text for tok in tokens]
                 for word in words:
                     self.dictionary.add_word(word)
                     data.append(word)
@@ -42,3 +47,10 @@ class TextProcess(object):
         batch_data = data_indeces[:max_num_tokens]
         batch_data = batch_data.view(batch_size, -1)
         return batch_data
+    
+def train_test_split(data_indeces):
+    num_words = len(data_indeces)
+    train_split = int(num_words*0.7)
+    train_data = data_indeces[:train_split]
+    test_data = data_indeces[train_split:]
+    return train_data, test_data
