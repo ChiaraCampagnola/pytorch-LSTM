@@ -8,3 +8,4 @@ alice_model.pt
 test.py
 alice_model_20epochs.pt
 alice_model_30.pt
+alice_model_40.pt

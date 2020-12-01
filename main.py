@@ -10,10 +10,7 @@ corpus = TextProcess()
 
 batch_size = 6
 _, data_indeces = corpus.get_data('mini_alice.txt')
-train_data, test_data = train_test_split(data_indeces)
-train_batch = corpus.get_batched_data(train_data, batch_size=batch_size)
-test_batch = corpus.get_batched_data(test_data, batch_size=batch_size)
-data = (train_batch, test_batch)
+batch_data = corpus.get_batched_data(data_indeces, batch_size=batch_size)
 
 # Set parameters
 embed_size = 128
@@ -34,7 +31,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 epochs = 2
 
 model.to(device)   
-train(model, data, sequence_length, epochs, loss_fn, optimizer)
+train(model, batch_data, sequence_length, epochs, loss_fn, optimizer)
 
 
 #torch.save(model.state_dict(), "alice_model_50.pt")

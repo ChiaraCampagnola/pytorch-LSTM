@@ -26,13 +26,11 @@ class TextGenerator(nn.Module):
         out = self.linear(out)
         return out, (h, c)
 
-def train(model, data, seq_length, epochs, loss_function, optimizer):
-    train_batch, test_batch = data
+def train(model, batch_data, seq_length, epochs, loss_function, optimizer):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print('Training model...')
 
-    batch_size, num_batches = train_batch.shape
-    _, num_batches_test = test_batch.shape
+    batch_size, num_batches = batch_data.shape
     hidden_size = model.lstm.hidden_size
     num_layers = model.lstm.num_layers
     
@@ -50,8 +48,8 @@ def train(model, data, seq_length, epochs, loss_function, optimizer):
         num_steps = math.ceil((num_batches-seq_length)/seq_length)
         current_step = 1
         for i in range(0, num_batches-seq_length, seq_length):
-            src = train_batch[:, i:i+seq_length]
-            trg = train_batch[:, (i+1):(i+1)+seq_length]
+            src = batch_data[:, i:i+seq_length]
+            trg = batch_data[:, (i+1):(i+1)+seq_length]
             
             src = src.to(device)
             trg = trg.to(device)
@@ -66,31 +64,11 @@ def train(model, data, seq_length, epochs, loss_function, optimizer):
             epoch_loss += loss.item()
             print(f'Running epoch [{epoch+1}/{epochs}],'
                   f'Step: [{current_step}/{num_steps}],'
-                  f'Loss: {epoch_loss/num_batches:.2f}               ', end="\r", flush=True)
+                  f'Loss: {epoch_loss:.2f}               ', end="\r", flush=True)
             current_step += 1
             
-        # Evaluate on test
-        model.eval()
-        # Initialise hidden and cell state
-        h = torch.zeros(num_layers, batch_size, hidden_size)
-        c = torch.zeros(num_layers, batch_size, hidden_size)
-        h = h.to(device)
-        c = c.to(device)
         
-        total_loss = 0.0
-        for i in range(0, num_batches_test-seq_length, seq_length):
-            src = test_batch[:, i:i+seq_length]
-            trg = test_batch[:, (i+1):(i+1)+seq_length]
-            
-            src = src.to(device)
-            trg = trg.to(device)
-            
-            out, _ = model(src, (h,c))          
-            loss = loss_function(out, trg.reshape(-1))
-            total_loss += loss.item()
-            
-        
-        print(f'Epoch [{epoch+1}/{epochs}], Train loss: {epoch_loss/num_batches:.2f}, Validation loss: {total_loss/num_batches_test:.2f}                                ')
+        print(f'Epoch [{epoch+1}/{epochs}], Train loss: {epoch_loss:.2f}                                ')
     print("Finished training\n")
         
 def generate(model, corpus, first_word, text_length, path='result.txt'):
